@@ -15,7 +15,6 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
-import android.service.notification.NotificationListenerService
 
 class MainActivity : Activity() {
 
@@ -303,7 +302,7 @@ class MainActivity : Activity() {
 
         val cover = TextView(this).apply {
             text = "♫"
-            textSize = 48f
+            textSize = 38f
             gravity = Gravity.CENTER
             setTextColor(white)
 
@@ -315,25 +314,25 @@ class MainActivity : Activity() {
 
         music.addView(
             cover,
-            LinearLayout.LayoutParams(-1, dp(75))
+            LinearLayout.LayoutParams(-1, dp(55))
         )
 
         musicTitleView = makeText(
             "Esperando canción...",
-            16f,
+            15f,
             white,
             true
         )
 
         musicArtistView = makeText(
             "Artista desconocido",
-            12f,
+            11f,
             gray
         )
 
         musicStatusView = makeText(
             "Sin conexión multimedia",
-            11f,
+            10f,
             red,
             true
         )
@@ -349,40 +348,33 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
 
-        val previous = makeButton("ANTERIOR") {
+        val previous = makeButton("⏮") {
             previousMusic()
         }
 
-        playPauseButton = makeButton("REPRODUCIR") {
+        playPauseButton = makeButton("▶") {
             toggleMusic()
         }
 
-        val next = makeButton("SIGUIENTE") {
+        val next = makeButton("⏭") {
             nextMusic()
         }
 
-        controls.addView(
-            previous,
-            LinearLayout.LayoutParams(0, dp(42), 1f)
-        )
+        fun controlParams(): LinearLayout.LayoutParams {
+            return LinearLayout.LayoutParams(
+                0,
+                dp(44),
+                1f
+            ).apply {
+                setMargins(dp(2), dp(5), dp(2), dp(5))
+            }
+        }
 
-        controls.addView(
-            playPauseButton,
-            LinearLayout.LayoutParams(0, dp(42), 1f)
-        )
-
-        controls.addView(
-            next,
-            LinearLayout.LayoutParams(0, dp(42), 1f)
-        )
+        controls.addView(previous, controlParams())
+        controls.addView(playPauseButton, controlParams())
+        controls.addView(next, controlParams())
 
         music.addView(controls)
-
-        music.addView(
-            makeButton("AUTORIZAR ACCESO MULTIMEDIA") {
-                openNotificationSettings()
-            }
-        )
 
         music.addView(
             makeButton("ABRIR YOUTUBE MUSIC") {
@@ -397,10 +389,8 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -1, 1.5f)
         )
 
-        val spacer = android.view.View(this)
-
         panel.addView(
-            spacer,
+            android.view.View(this),
             LinearLayout.LayoutParams(dp(10), 1)
         )
 
@@ -458,7 +448,7 @@ class MainActivity : Activity() {
                 musicStatusView?.text =
                     "Abre YouTube Music y reproduce música"
 
-                playPauseButton?.text = "REPRODUCIR"
+                playPauseButton?.text = "▶"
 
                 return
             }
@@ -538,7 +528,7 @@ class MainActivity : Activity() {
             if (playing) "REPRODUCIENDO" else "EN PAUSA"
 
         playPauseButton?.text =
-            if (playing) "PAUSAR" else "REPRODUCIR"
+            if (playing) "Ⅱ" else "▶"
     }
 
     // REPRODUCCION
