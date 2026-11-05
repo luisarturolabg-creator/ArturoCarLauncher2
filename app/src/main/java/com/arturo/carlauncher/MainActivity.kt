@@ -1,8 +1,10 @@
+
 package com.arturo.carlauncher
 
 import android.app.Activity
 import android.os.Bundle
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.graphics.Color
 import android.graphics.Typeface
@@ -10,15 +12,14 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.TextClock
+import android.widget.Space
 import android.widget.Toast
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainActivity : Activity() {
 
     private val backgroundColor = Color.rgb(15, 18, 25)
-    private val accentColor = Color.rgb(0, 180, 255)
+    private val accentColor = Color.rgb(54, 191, 255)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,84 +34,92 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(35, 25, 35, 25)
+            setPadding(32, 24, 32, 24)
             setBackgroundColor(backgroundColor)
         }
 
         val header = TextView(this).apply {
             text = "ARTURO CAR LAUNCHER"
-            textSize = 18f
+            textSize = 19f
             setTextColor(accentColor)
             typeface = Typeface.DEFAULT_BOLD
         }
 
         root.addView(header)
 
-        val clock = TextView(this).apply {
-            text = SimpleDateFormat(
-                "HH:mm",
-                Locale.getDefault()
-            ).format(Date())
-            textSize = 65f
+        // Espacio superior
+        root.addView(
+            Space(this),
+            LinearLayout.LayoutParams(1, 0, 1f)
+        )
+
+        // RELOJ CENTRAL
+        val clock = TextClock(this).apply {
+            format24Hour = "HH:mm"
+            format12Hour = "h:mm a"
+            textSize = 76f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            includeFontPadding = false
+            isSingleLine = true
         }
 
         root.addView(
             clock,
-            LinearLayout.LayoutParams(
-                -1, 110
-            )
+            LinearLayout.LayoutParams(-1, 125)
         )
 
-        val date = TextView(this).apply {
-            text = SimpleDateFormat(
-                "EEEE, dd MMMM yyyy",
-                Locale.getDefault()
-            ).format(Date())
-            textSize = 17f
+        // FECHA
+        val date = TextClock(this).apply {
+            format24Hour = "EEEE, dd MMMM yyyy"
+            format12Hour = "EEEE, dd MMMM yyyy"
+            textSize = 18f
             setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
         }
 
-        root.addView(date)
-
-        val spacer = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
         root.addView(
-            spacer,
-            LinearLayout.LayoutParams(1, 25)
+            date,
+            LinearLayout.LayoutParams(-1, 45)
         )
 
+        // Espacio entre reloj y botones
+        root.addView(
+            Space(this),
+            LinearLayout.LayoutParams(1, 0, 1f)
+        )
+
+        // BOTONES INFERIORES
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
 
-        addButton(buttons, "MAPS") {
-            openApp("com.google.android.apps.maps")
+        addButton(buttons, "🗺\nMAPS") {
+            openMaps()
         }
 
-        addButton(buttons, "MUSIC") {
-            openApp("com.google.android.apps.youtube.music")
+        addButton(buttons, "♫\nMUSIC") {
+            openYouTubeMusic()
         }
 
-        addButton(buttons, "BLUETOOTH") {
+        addButton(buttons, "ᛒ\nBLUETOOTH") {
             startActivity(
                 Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
             )
         }
 
-        addButton(buttons, "SETTINGS") {
+        addButton(buttons, "⚙\nAJUSTES") {
             startActivity(
                 Intent(Settings.ACTION_SETTINGS)
             )
         }
 
-        root.addView(buttons)
+        root.addView(
+            buttons,
+            LinearLayout.LayoutParams(-1, 105)
+        )
 
         setContentView(root)
     }
@@ -123,14 +132,14 @@ class MainActivity : Activity() {
 
         val button = TextView(this).apply {
             text = label
-            textSize = 13f
+            textSize = 16f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
 
             background = GradientDrawable().apply {
                 setColor(Color.rgb(35, 43, 55))
-                cornerRadius = 18f
+                cornerRadius = 20f
                 setStroke(2, accentColor)
             }
 
@@ -140,27 +149,81 @@ class MainActivity : Activity() {
         }
 
         val params = LinearLayout.LayoutParams(
-            0, 85, 1f
+            0, -1, 1f
         )
 
-        params.setMargins(6, 5, 6, 5)
+        params.setMargins(8, 5, 8, 5)
 
         parent.addView(button, params)
     }
 
-    private fun openApp(packageName: String) {
+    // GOOGLE MAPS
+    private fun openMaps() {
 
-        val launchIntent =
+        val intent = packageManager
+            .getLaunchIntentForPackage(
+                "com.google.android.apps.maps"
+            )
+
+        if (intent != null) {
+            startActivity(intent)
+        } else {
+            try {
+                startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://www.google.com/maps")
+                    )
+                )
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    "No se encontró una aplicación de mapas",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    // YOUTUBE MUSIC
+    private fun openYouTubeMusic() {
+
+        val packageName =
+            "com.google.android.apps.youtube.music"
+
+        val intent =
             packageManager.getLaunchIntentForPackage(packageName)
 
-        if (launchIntent != null) {
-            startActivity(launchIntent)
+        if (intent != null) {
+            startActivity(intent)
         } else {
-            Toast.makeText(
-                this,
-                "Aplicación no instalada",
-                Toast.LENGTH_SHORT
-            ).show()
+            try {
+                startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(
+                            "market://details?id=$packageName"
+                        )
+                    )
+                )
+            } catch (e: Exception) {
+                try {
+                    startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(
+                                "https://play.google.com/store/apps/details?id=$packageName"
+                            )
+                        )
+                    )
+                } catch (ex: Exception) {
+                    Toast.makeText(
+                        this,
+                        "No se pudo abrir YouTube Music",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 }
