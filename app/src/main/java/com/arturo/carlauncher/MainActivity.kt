@@ -77,7 +77,7 @@ class MainActivity : Activity() {
 
         root.addView(
             content,
-            LinearLayout.LayoutParams(0, 0, 1f)
+            LinearLayout.LayoutParams(-1, 0, 1f)
         )
 
         navigation = LinearLayout(this).apply {
