@@ -571,19 +571,19 @@ class MainActivity : Activity() {
 
         // BUSCADOR
 
-        val search = EditText(this).apply {
-            hint = "Buscar canción o artista..."
-            setHintTextColor(gray)
-            setTextColor(white)
-            textSize = 14f
-            singleLine = true
-            setPadding(dp(12), 0, dp(12), 0)
+val search = EditText(this).apply {
+    hint = "Buscar canción o artista..."
+    setHintTextColor(gray)
+    setTextColor(white)
+    textSize = 14f
+    isSingleLine = true
+    setPadding(dp(12), 0, dp(12), 0)
 
-            background = GradientDrawable().apply {
-                setColor(card)
-                cornerRadius = dp(10).toFloat()
-            }
-        }
+    background = GradientDrawable().apply {
+        setColor(card)
+        cornerRadius = dp(10).toFloat()
+    }
+}
 
         root.addView(
             search,
