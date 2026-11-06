@@ -1,3 +1,4 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -29,4 +30,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    // Reproductor de audio ExoPlayer
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+
+    // Controles multimedia y reproducción en segundo plano
+    implementation("androidx.media3:media3-session:1.11.1")
 }
