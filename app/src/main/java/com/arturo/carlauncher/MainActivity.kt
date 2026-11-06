@@ -1,20 +1,25 @@
 package com.arturo.carlauncher
 
-import android.view.KeyEvent
+import android.Manifest
 import android.app.Activity
 import android.os.Bundle
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.content.Intent
-import android.content.ComponentName
-import android.net.Uri
+import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.widget.*
-import android.media.MediaMetadata
-import android.media.session.MediaController
-import android.media.session.MediaSessionManager
-import android.media.session.PlaybackState
+import android.text.Editable
+import android.text.TextWatcher
 
 class MainActivity : Activity() {
 
@@ -29,14 +34,22 @@ class MainActivity : Activity() {
 
     private var currentPage = "INICIO"
 
-    // YOUTUBE MUSIC
-    private var musicController: MediaController? = null
-    private var musicCallback: MediaController.Callback? = null
+    // BIBLIOTECA MUSICAL
+
+    private var songs = listOf<Song>()
+    private var currentPlaylist = listOf<Song>()
+    private var currentIndex = -1
+
+    private var musicTab = "CANCIONES"
+    private var selectedFolder: String? = null
 
     private var musicTitleView: TextView? = null
     private var musicArtistView: TextView? = null
     private var musicStatusView: TextView? = null
     private var playPauseButton: TextView? = null
+    private var musicCoverView: ImageView? = null
+
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,20 +59,109 @@ class MainActivity : Activity() {
 
         createMainLayout()
         showPage("INICIO")
+
+        MusicPlayback.connect(this)
     }
 
     override fun onResume() {
         super.onResume()
-        refreshMusicSession()
-    }
 
-    override fun onDestroy() {
-        unregisterMusicCallback()
-        super.onDestroy()
+        if (hasAudioPermission()) {
+            loadMusicLibrary()
+        }
+
+        refreshHomeMusic()
     }
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    // PERMISOS
+
+    private fun hasAudioPermission(): Boolean {
+
+        val permission = if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        return checkSelfPermission(permission) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestAudioPermission() {
+
+        val permission = if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+        requestPermissions(
+            arrayOf(permission),
+            100
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
+
+        if (requestCode == 100) {
+
+            if (
+                grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ) {
+                loadMusicLibrary()
+                showPage("MÚSICA")
+            } else {
+                Toast.makeText(
+                    this,
+                    "Se necesita permiso para consultar la música",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    // CARGAR BIBLIOTECA
+
+    private fun loadMusicLibrary() {
+
+        if (!hasAudioPermission()) return
+
+        Thread {
+
+            val result = MusicLibrary.getSongs(this)
+
+            runOnUiThread {
+
+                songs = result
+
+                if (currentPage == "MÚSICA") {
+                    showPage("MÚSICA")
+                }
+
+                if (songs.isEmpty()) {
+                    Toast.makeText(
+                        this,
+                        "No se encontraron canciones",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+        }.start()
     }
 
     // ESTRUCTURA PRINCIPAL
@@ -130,6 +232,7 @@ class MainActivity : Activity() {
         val screen = when (page) {
             "INICIO" -> homeScreen()
             "APPS" -> appsScreen()
+            "MÚSICA" -> musicScreen()
             "AUTONOMÍA" -> autonomyScreen()
             "MAPS" -> mapsScreen()
             else -> homeScreen()
@@ -143,7 +246,7 @@ class MainActivity : Activity() {
         updateNavigation()
 
         if (page == "INICIO") {
-            refreshMusicSession()
+            refreshHomeMusic()
         }
     }
 
@@ -156,6 +259,7 @@ class MainActivity : Activity() {
         val items = listOf(
             "⌂" to "INICIO",
             "▦" to "APPS",
+            "♫" to "MÚSICA",
             "◉" to "AUTONOMÍA",
             "⌖" to "MAPS"
         )
@@ -166,20 +270,22 @@ class MainActivity : Activity() {
 
             val button = TextView(this).apply {
                 text = "${item.first}\n${item.second}"
-                textSize = 11f
+                textSize = 10f
                 gravity = Gravity.CENTER
                 setTextColor(if (selected) red else gray)
 
-                typeface = if (selected)
+                typeface = if (selected) {
                     Typeface.DEFAULT_BOLD
-                else
+                } else {
                     Typeface.DEFAULT
+                }
 
                 setBackgroundColor(
-                    if (selected)
+                    if (selected) {
                         Color.rgb(43, 27, 30)
-                    else
+                    } else {
                         Color.TRANSPARENT
+                    }
                 )
 
                 setOnClickListener {
@@ -252,16 +358,16 @@ class MainActivity : Activity() {
         }
     }
 
-    // PANTALLA INICIO
+    // INICIO
 
-    private fun homeScreen(): android.view.View {
+    private fun homeScreen(): View {
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(4), dp(8), dp(4), dp(8))
         }
 
-        // TARJETA MAPS
+        // MAPS
 
         val map = makeCard()
 
@@ -292,34 +398,28 @@ class MainActivity : Activity() {
             }
         )
 
-        // TARJETA MUSICA
+        // MUSICA
 
         val music = makeCard()
 
         music.addView(
-            makeText("YOUTUBE MUSIC", 17f, red, true)
+            makeText("REPRODUCTOR", 17f, red, true)
         )
 
-        val cover = TextView(this).apply {
-            text = "♫"
-            textSize = 38f
-            gravity = Gravity.CENTER
-            setTextColor(white)
-
-            background = GradientDrawable().apply {
-                setColor(Color.rgb(75, 25, 32))
-                cornerRadius = dp(12).toFloat()
-            }
+        musicCoverView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setBackgroundColor(Color.rgb(75, 25, 32))
+            setImageResource(android.R.drawable.ic_media_play)
         }
 
         music.addView(
-            cover,
-            LinearLayout.LayoutParams(-1, dp(55))
+            musicCoverView,
+            LinearLayout.LayoutParams(-1, dp(95))
         )
 
         musicTitleView = makeText(
-            "Esperando canción...",
-            15f,
+            "Selecciona una canción",
+            14f,
             white,
             true
         )
@@ -331,7 +431,7 @@ class MainActivity : Activity() {
         )
 
         musicStatusView = makeText(
-            "Sin conexión multimedia",
+            "Biblioteca musical",
             10f,
             red,
             true
@@ -341,29 +441,27 @@ class MainActivity : Activity() {
         music.addView(musicArtistView)
         music.addView(musicStatusView)
 
-        // CONTROLES MUSICALES
-
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
 
         val previous = makeButton("⏮") {
-            previousMusic()
+            previousSong()
         }
 
         playPauseButton = makeButton("▶") {
-            toggleMusic()
+            toggleSong()
         }
 
         val next = makeButton("⏭") {
-            nextMusic()
+            nextSong()
         }
 
         fun controlParams(): LinearLayout.LayoutParams {
             return LinearLayout.LayoutParams(
                 0,
-                dp(44),
+                dp(42),
                 1f
             ).apply {
                 setMargins(dp(2), dp(5), dp(2), dp(5))
@@ -377,12 +475,10 @@ class MainActivity : Activity() {
         music.addView(controls)
 
         music.addView(
-            makeButton("ABRIR YOUTUBE MUSIC") {
-                openMusic()
+            makeButton("ABRIR MI MÚSICA") {
+                showPage("MÚSICA")
             }
         )
-
-        // DISTRIBUCION HORIZONTAL
 
         panel.addView(
             map,
@@ -390,7 +486,7 @@ class MainActivity : Activity() {
         )
 
         panel.addView(
-            android.view.View(this),
+            View(this),
             LinearLayout.LayoutParams(dp(10), 1)
         )
 
@@ -402,256 +498,463 @@ class MainActivity : Activity() {
         return panel
     }
 
-    // CONEXION CON YOUTUBE MUSIC
+    // APARTADO MUSICA
 
-    private fun unregisterMusicCallback() {
+    private fun musicScreen(): View {
 
-        musicController?.let { controller ->
-            musicCallback?.let { callback ->
-                try {
-                    controller.unregisterCallback(callback)
-                } catch (_: Exception) {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(4))
+        }
+
+        root.addView(
+            makeText("♫ MI MÚSICA", 21f, red, true)
+        )
+
+        if (!hasAudioPermission()) {
+
+            root.addView(
+                makeText(
+                    "Necesitamos permiso para consultar tus canciones.",
+                    14f,
+                    gray
+                )
+            )
+
+            root.addView(
+                makeButton("PERMITIR ACCESO A MÚSICA") {
+                    requestAudioPermission()
                 }
+            )
+
+            return root
+        }
+
+        // PESTAÑAS
+
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        val songsTab = makeButton("CANCIONES") {
+            musicTab = "CANCIONES"
+            selectedFolder = null
+            showPage("MÚSICA")
+        }
+
+        val foldersTab = makeButton("CARPETAS") {
+            musicTab = "CARPETAS"
+            selectedFolder = null
+            showPage("MÚSICA")
+        }
+
+        if (musicTab == "CANCIONES") {
+            songsTab.alpha = 1f
+            foldersTab.alpha = 0.5f
+        } else {
+            songsTab.alpha = 0.5f
+            foldersTab.alpha = 1f
+        }
+
+        tabs.addView(
+            songsTab,
+            LinearLayout.LayoutParams(0, dp(42), 1f)
+        )
+
+        tabs.addView(
+            foldersTab,
+            LinearLayout.LayoutParams(0, dp(42), 1f)
+        )
+
+        root.addView(tabs)
+
+        // BUSCADOR
+
+        val search = EditText(this).apply {
+            hint = "Buscar canción o artista..."
+            setHintTextColor(gray)
+            setTextColor(white)
+            textSize = 14f
+            singleLine = true
+            setPadding(dp(12), 0, dp(12), 0)
+
+            background = GradientDrawable().apply {
+                setColor(card)
+                cornerRadius = dp(10).toFloat()
             }
         }
 
-        musicCallback = null
-        musicController = null
-    }
+        root.addView(
+            search,
+            LinearLayout.LayoutParams(-1, dp(45)).apply {
+                setMargins(0, dp(7), 0, dp(7))
+            }
+        )
 
-    private fun refreshMusicSession() {
+        val scroll = ScrollView(this)
 
-        try {
+        val list = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
 
-            val manager = getSystemService(
-                MEDIA_SESSION_SERVICE
-            ) as MediaSessionManager
+        scroll.addView(list)
 
-            val component = ComponentName(
-                this,
-                MusicSessionListener::class.java
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(-1, 0, 1f)
+        )
+
+        if (songs.isEmpty()) {
+
+            list.addView(
+                makeText(
+                    "No se encontraron canciones.",
+                    14f,
+                    gray
+                )
             )
 
-            val controller = manager
-                .getActiveSessions(component)
-                .firstOrNull {
-                    it.packageName ==
-                        "com.google.android.apps.youtube.music"
+            list.addView(
+                makeButton("ACTUALIZAR BIBLIOTECA") {
+                    loadMusicLibrary()
                 }
+            )
 
-            if (controller == null) {
+            return root
+        }
 
-                unregisterMusicCallback()
+        // FUNCION PARA DIBUJAR LISTA
 
-                musicTitleView?.text = "YouTube Music"
-                musicArtistView?.text = "Sin canción activa"
-                musicStatusView?.text =
-                    "Abre YouTube Music y reproduce música"
+        fun drawList(query: String = "") {
 
-                playPauseButton?.text = "▶"
+            list.removeAllViews()
+
+            val normalizedQuery = query.trim().lowercase()
+
+            if (musicTab == "CARPETAS" && selectedFolder == null) {
+
+                val folders = songs
+                    .groupBy { it.folder }
+                    .toSortedMap(
+                        compareBy(String.CASE_INSENSITIVE_ORDER) { it }
+                    )
+
+                folders.forEach { (folder, folderSongs) ->
+
+                    val row = makeMusicRow(
+                        "📁 $folder",
+                        "${folderSongs.size} canciones",
+                        "›"
+                    ) {
+                        selectedFolder = folder
+                        musicTab = "CANCIONES"
+                        showPage("MÚSICA")
+                    }
+
+                    list.addView(row)
+                }
 
                 return
             }
 
-            if (
-                musicController?.sessionToken !=
-                controller.sessionToken
-            ) {
+            val filtered = songs
+                .filter { song ->
 
-                unregisterMusicCallback()
+                    val matchesFolder =
+                        selectedFolder == null ||
+                        song.folder == selectedFolder
 
-                musicController = controller
+                    val matchesSearch =
+                        normalizedQuery.isEmpty() ||
+                        song.title.lowercase().contains(normalizedQuery) ||
+                        song.artist.lowercase().contains(normalizedQuery)
 
-                val callback =
-                    object : MediaController.Callback() {
+                    matchesFolder && matchesSearch
+                }
+                .sortedBy { it.title.lowercase() }
 
-                        override fun onMetadataChanged(
-                            metadata: MediaMetadata?
-                        ) {
-                            updateMusicInfo()
-                        }
+            if (selectedFolder != null) {
 
-                        override fun onPlaybackStateChanged(
-                            state: PlaybackState?
-                        ) {
-                            updateMusicInfo()
-                        }
-
-                        override fun onSessionDestroyed() {
-                            runOnUiThread {
-                                refreshMusicSession()
-                            }
-                        }
+                list.addView(
+                    makeButton("← VOLVER A CARPETAS") {
+                        selectedFolder = null
+                        musicTab = "CARPETAS"
+                        showPage("MÚSICA")
                     }
+                )
 
-                musicCallback = callback
-
-                controller.registerCallback(callback)
+                list.addView(
+                    makeText(
+                        selectedFolder ?: "",
+                        13f,
+                        red,
+                        true
+                    )
+                )
             }
 
-            updateMusicInfo()
-
-        } catch (e: SecurityException) {
-
-            musicStatusView?.text =
-                "Autoriza el acceso multimedia"
-
-        } catch (e: Exception) {
-
-            musicStatusView?.text =
-                "No se pudo conectar con YouTube Music"
-        }
-    }
-
-    // ACTUALIZAR INFORMACION DE LA CANCION
-
-    private fun updateMusicInfo() {
-
-        val controller = musicController ?: return
-        val metadata = controller.metadata
-
-        musicTitleView?.text =
-            metadata?.getString(
-                MediaMetadata.METADATA_KEY_TITLE
-            ) ?: "Sin canción"
-
-        musicArtistView?.text =
-            metadata?.getString(
-                MediaMetadata.METADATA_KEY_ARTIST
-            ) ?: "Artista desconocido"
-
-        val playing =
-            controller.playbackState?.state ==
-                PlaybackState.STATE_PLAYING
-
-        musicStatusView?.text =
-            if (playing) "REPRODUCIENDO" else "EN PAUSA"
-
-        playPauseButton?.text =
-            if (playing) "Ⅱ" else "▶"
-    }
-
-    
-    // REPRODUCCION
-
-    private fun sendMediaKey(keyCode: Int): Boolean {
-        val controller = musicController ?: return false
-
-        return try {
-            val down = KeyEvent(
-                KeyEvent.ACTION_DOWN,
-                keyCode
-            )
-
-            val up = KeyEvent(
-                KeyEvent.ACTION_UP,
-                keyCode
-            )
-
-            val first = controller.dispatchMediaButtonEvent(down)
-            val second = controller.dispatchMediaButtonEvent(up)
-
-            first || second
-
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun toggleMusic() {
-
-        if (musicController == null) {
-            refreshMusicSession()
-        }
-
-        val controller = musicController
-
-        if (controller == null) {
-            Toast.makeText(
-                this,
-                "No hay sesión multimedia activa",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val state = controller.playbackState?.state
-
-        val keyCode = if (
-            state == PlaybackState.STATE_PLAYING
-        ) {
-            KeyEvent.KEYCODE_MEDIA_PAUSE
-        } else {
-            KeyEvent.KEYCODE_MEDIA_PLAY
-        }
-
-        val sent = sendMediaKey(keyCode)
-
-        if (!sent) {
-            Toast.makeText(
-                this,
-                "YouTube Music no aceptó el comando",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        updateMusicInfo()
-    }
-
-    private fun nextMusic() {
-
-        if (musicController == null) {
-            refreshMusicSession()
-        }
-
-        if (!sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)) {
-            Toast.makeText(
-                this,
-                "No se pudo cambiar la canción",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    private fun previousMusic() {
-
-        if (musicController == null) {
-            refreshMusicSession()
-        }
-
-        if (!sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)) {
-            Toast.makeText(
-                this,
-                "No se pudo regresar la canción",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-
-    // PERMISOS MULTIMEDIA
-
-    private fun openNotificationSettings() {
-
-        try {
-            startActivity(
-                Intent(
-                    android.provider.Settings
-                        .ACTION_NOTIFICATION_LISTENER_SETTINGS
+            list.addView(
+                makeText(
+                    "${filtered.size} canciones",
+                    11f,
+                    gray
                 )
             )
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                "No se pudieron abrir los permisos",
-                Toast.LENGTH_SHORT
-            ).show()
+
+            filtered.forEach { song ->
+
+                val index = filtered.indexOf(song)
+
+                list.addView(
+                    makeMusicRow(
+                        song.title,
+                        song.artist,
+                        "▶"
+                    ) {
+                        currentPlaylist = filtered
+                        currentIndex = index
+
+                        MusicPlayback.playSongs(
+                            this@MainActivity,
+                            currentPlaylist,
+                            currentIndex
+                        )
+
+                        refreshHomeMusic()
+
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Reproduciendo: ${song.title}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+        }
+
+        drawList()
+
+        search.addTextChangedListener(
+            object : TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    drawList(s?.toString() ?: "")
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) {}
+            }
+        )
+
+        return root
+    }
+
+    // FILA DE CANCION O CARPETA
+
+    private fun makeMusicRow(
+        title: String,
+        subtitle: String,
+        actionLabel: String,
+        action: () -> Unit
+    ): LinearLayout {
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+
+            background = GradientDrawable().apply {
+                setColor(card)
+                cornerRadius = dp(10).toFloat()
+            }
+
+            setOnClickListener {
+                action()
+            }
+        }
+
+        val icon = TextView(this).apply {
+            text = "♫"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(red)
+        }
+
+        row.addView(
+            icon,
+            LinearLayout.LayoutParams(dp(45), dp(45))
+        )
+
+        val labels = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        labels.addView(
+            makeText(title, 13f, white, true)
+        )
+
+        labels.addView(
+            makeText(subtitle, 10f, gray)
+        )
+
+        row.addView(
+            labels,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        row.addView(
+            makeText(actionLabel, 20f, red, true)
+        )
+
+        row.layoutParams = LinearLayout.LayoutParams(
+            -1,
+            dp(58)
+        ).apply {
+            setMargins(0, dp(3), 0, dp(3))
+        }
+
+        return row
+    }
+
+    // CONTROLES MUSICALES
+
+    private fun toggleSong() {
+
+        MusicPlayback.connect(this) {
+
+            MusicPlayback.toggle()
+
+            handler.postDelayed({
+                refreshHomeMusic()
+            }, 400)
         }
     }
 
-    // PANTALLA APLICACIONES
+    private fun nextSong() {
 
-    private fun appsScreen(): android.view.View {
+        if (currentPlaylist.isEmpty()) return
+
+        if (currentIndex < currentPlaylist.lastIndex) {
+            currentIndex++
+        } else {
+            currentIndex = 0
+        }
+
+        MusicPlayback.playSongs(
+            this,
+            currentPlaylist,
+            currentIndex
+        )
+
+        handler.postDelayed({
+            refreshHomeMusic()
+        }, 400)
+    }
+
+    private fun previousSong() {
+
+        if (currentPlaylist.isEmpty()) return
+
+        if (currentIndex > 0) {
+            currentIndex--
+        } else {
+            currentIndex = currentPlaylist.lastIndex
+        }
+
+        MusicPlayback.playSongs(
+            this,
+            currentPlaylist,
+            currentIndex
+        )
+
+        handler.postDelayed({
+            refreshHomeMusic()
+        }, 400)
+    }
+
+    // ACTUALIZAR TARJETA PRINCIPAL
+
+    private fun refreshHomeMusic() {
+
+        if (currentPage != "INICIO") return
+
+        val title = MusicPlayback.currentTitle()
+        val artist = MusicPlayback.currentArtist()
+        val playing = MusicPlayback.isPlaying()
+
+        musicTitleView?.text = title
+        musicArtistView?.text = artist
+
+        musicStatusView?.text = if (playing) {
+            "REPRODUCIENDO"
+        } else {
+            "EN PAUSA"
+        }
+
+        playPauseButton?.text = if (playing) "Ⅱ" else "▶"
+
+        currentPlaylist.getOrNull(currentIndex)?.let {
+            loadArtwork(it.uri)
+        }
+    }
+
+    // CARATULA DEL ALBUM
+
+    private fun loadArtwork(uri: Uri) {
+
+        try {
+
+            val retriever = MediaMetadataRetriever()
+
+            retriever.setDataSource(this, uri)
+
+            val artwork = retriever.embeddedPicture
+
+            if (artwork != null) {
+
+                val bitmap = BitmapFactory.decodeByteArray(
+                    artwork,
+                    0,
+                    artwork.size
+                )
+
+                musicCoverView?.setImageBitmap(bitmap)
+
+            } else {
+
+                musicCoverView?.setImageResource(
+                    android.R.drawable.ic_media_play
+                )
+            }
+
+            retriever.release()
+
+        } catch (e: Exception) {
+
+            musicCoverView?.setImageResource(
+                android.R.drawable.ic_media_play
+            )
+        }
+    }
+
+    // APLICACIONES
+
+    private fun appsScreen(): View {
 
         val scroll = ScrollView(this)
 
@@ -707,9 +1010,7 @@ class MainActivity : Activity() {
 
                     addView(
                         icon,
-                        LinearLayout.LayoutParams(
-                            dp(42), dp(42)
-                        )
+                        LinearLayout.LayoutParams(dp(42), dp(42))
                     )
 
                     val name = TextView(this@MainActivity).apply {
@@ -730,33 +1031,25 @@ class MainActivity : Activity() {
                             )
 
                         if (launch != null) {
-                            try {
-                                startActivity(launch)
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "No se pudo abrir la aplicación",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                            startActivity(launch)
                         }
                     }
                 }
 
                 val params = LinearLayout.LayoutParams(
-                    0, dp(105), 1f
+                    0,
+                    dp(105),
+                    1f
                 )
 
-                params.setMargins(
-                    dp(4), dp(4), dp(4), dp(4)
-                )
+                params.setMargins(dp(4), dp(4), dp(4), dp(4))
 
                 row.addView(tile, params)
             }
 
             repeat(columns - group.size) {
                 row.addView(
-                    android.view.View(this),
+                    View(this),
                     LinearLayout.LayoutParams(0, dp(105), 1f)
                 )
             }
@@ -768,9 +1061,9 @@ class MainActivity : Activity() {
         return scroll
     }
 
-    // PANTALLA AUTONOMIA
+    // AUTONOMIA
 
-    private fun autonomyScreen(): android.view.View {
+    private fun autonomyScreen(): View {
 
         val scroll = ScrollView(this)
 
@@ -780,12 +1073,7 @@ class MainActivity : Activity() {
         }
 
         column.addView(
-            makeText(
-                "AUTONOMÍA DEL VEHÍCULO",
-                19f,
-                red,
-                true
-            )
+            makeText("AUTONOMÍA DEL VEHÍCULO", 19f, red, true)
         )
 
         column.addView(
@@ -849,10 +1137,7 @@ class MainActivity : Activity() {
         obd.addView(
             makeButton("CONFIGURAR BLUETOOTH") {
                 startActivity(
-                    Intent(
-                        android.provider.Settings
-                            .ACTION_BLUETOOTH_SETTINGS
-                    )
+                    Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
                 )
             }
         )
@@ -884,7 +1169,9 @@ class MainActivity : Activity() {
         )
 
         val params = LinearLayout.LayoutParams(
-            0, -1, 1f
+            0,
+            -1,
+            1f
         )
 
         params.setMargins(dp(3), dp(8), dp(3), dp(8))
@@ -892,9 +1179,9 @@ class MainActivity : Activity() {
         parent.addView(metric, params)
     }
 
-    // PANTALLA MAPS
+    // MAPS
 
-    private fun mapsScreen(): android.view.View {
+    private fun mapsScreen(): View {
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -923,7 +1210,7 @@ class MainActivity : Activity() {
         return column
     }
 
-    // ABRIR APLICACIONES
+    // ABRIR MAPS
 
     private fun openMaps() {
 
@@ -936,22 +1223,6 @@ class MainActivity : Activity() {
             startActivity(intent)
         } else {
             openWeb("https://www.google.com/maps")
-        }
-    }
-
-    private fun openMusic() {
-
-        val intent = packageManager
-            .getLaunchIntentForPackage(
-                "com.google.android.apps.youtube.music"
-            )
-
-        if (intent != null) {
-            startActivity(intent)
-        } else {
-            openWeb(
-                "https://play.google.com/store/apps/details?id=com.google.android.apps.youtube.music"
-            )
         }
     }
 
