@@ -531,55 +531,103 @@ class MainActivity : Activity() {
             if (playing) "Ⅱ" else "▶"
     }
 
+    
     // REPRODUCCION
 
+    private fun sendMediaKey(keyCode: Int): Boolean {
+        val controller = musicController ?: return false
+
+        return try {
+            val down = KeyEvent(
+                KeyEvent.ACTION_DOWN,
+                keyCode
+            )
+
+            val up = KeyEvent(
+                KeyEvent.ACTION_UP,
+                keyCode
+            )
+
+            val first = controller.dispatchMediaButtonEvent(down)
+            val second = controller.dispatchMediaButtonEvent(up)
+
+            first || second
+
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun toggleMusic() {
+
+        if (musicController == null) {
+            refreshMusicSession()
+        }
 
         val controller = musicController
 
         if (controller == null) {
-
-            refreshMusicSession()
-
             Toast.makeText(
                 this,
-                "Abre YouTube Music primero",
+                "No hay sesión multimedia activa",
                 Toast.LENGTH_SHORT
             ).show()
-
             return
         }
 
-        val playing =
-            controller.playbackState?.state ==
-                PlaybackState.STATE_PLAYING
+        val state = controller.playbackState?.state
 
-        if (playing) {
-            controller.transportControls.pause()
+        val keyCode = if (
+            state == PlaybackState.STATE_PLAYING
+        ) {
+            KeyEvent.KEYCODE_MEDIA_PAUSE
         } else {
-            controller.transportControls.play()
+            KeyEvent.KEYCODE_MEDIA_PLAY
         }
+
+        val sent = sendMediaKey(keyCode)
+
+        if (!sent) {
+            Toast.makeText(
+                this,
+                "YouTube Music no aceptó el comando",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        updateMusicInfo()
     }
 
     private fun nextMusic() {
 
         if (musicController == null) {
             refreshMusicSession()
-            return
         }
 
-        musicController?.transportControls?.skipToNext()
+        if (!sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)) {
+            Toast.makeText(
+                this,
+                "No se pudo cambiar la canción",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun previousMusic() {
 
         if (musicController == null) {
             refreshMusicSession()
-            return
         }
 
-        musicController?.transportControls?.skipToPrevious()
+        if (!sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)) {
+            Toast.makeText(
+                this,
+                "No se pudo regresar la canción",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
+
 
     // PERMISOS MULTIMEDIA
 
