@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.arturo.carlauncher"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.arturo.carlauncher"
