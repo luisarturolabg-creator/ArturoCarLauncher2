@@ -17,6 +17,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.webkit.WebView
 import android.widget.*
 import android.text.Editable
 import android.text.TextWatcher
