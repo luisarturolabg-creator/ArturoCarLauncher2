@@ -177,8 +177,28 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), 0, dp(8), 0)
+            setPadding(dp(4), 0, dp(8), 0)
         }
+
+        val settingsButton = TextView(this).apply {
+            text = "⚙"
+            textSize = 23f
+            gravity = Gravity.CENTER
+            setTextColor(white)
+            background = GradientDrawable().apply {
+                setColor(card)
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), red)
+            }
+            setOnClickListener { showPage("AJUSTES") }
+        }
+
+        header.addView(
+            settingsButton,
+            LinearLayout.LayoutParams(dp(42), dp(38)).apply {
+                setMargins(0, 0, dp(10), 0)
+            }
+        )
 
         val logo = TextView(this).apply {
             text = "ARTURO CAR"
@@ -233,7 +253,10 @@ class MainActivity : Activity() {
             "INICIO" -> homeScreen()
             "APPS" -> appsScreen()
             "MÚSICA" -> musicScreen()
+            "BLUETOOTH" -> bluetoothScreen()
             "AUTONOMÍA" -> autonomyScreen()
+            "DIAGNOSTIC CAR" -> diagnosticScreen()
+            "AJUSTES" -> settingsScreen()
             "MAPS" -> mapsScreen()
             else -> homeScreen()
         }
@@ -260,7 +283,9 @@ class MainActivity : Activity() {
             "⌂" to "INICIO",
             "▦" to "APPS",
             "♫" to "MÚSICA",
+            "ᛒ" to "BLUETOOTH",
             "◉" to "AUTONOMÍA",
+            "⚠" to "DIAGNOSTIC CAR",
             "⌖" to "MAPS"
         )
 
@@ -270,7 +295,7 @@ class MainActivity : Activity() {
 
             val button = TextView(this).apply {
                 text = "${item.first}\n${item.second}"
-                textSize = 10f
+                textSize = if (item.second == "DIAGNOSTIC CAR") 7f else 8f
                 gravity = Gravity.CENTER
                 setTextColor(if (selected) red else gray)
 
@@ -280,13 +305,18 @@ class MainActivity : Activity() {
                     Typeface.DEFAULT
                 }
 
-                setBackgroundColor(
+                background = GradientDrawable().apply {
+                    setColor(
+                        if (selected) Color.rgb(55, 20, 25)
+                        else Color.TRANSPARENT
+                    )
+                    cornerRadius = dp(9).toFloat()
                     if (selected) {
-                        Color.rgb(43, 27, 30)
-                    } else {
-                        Color.TRANSPARENT
+                        setStroke(dp(1), red)
                     }
-                )
+                }
+                setPadding(dp(1), 0, dp(1), 0)
+                maxLines = 2
 
                 setOnClickListener {
                     showPage(item.second)
@@ -375,16 +405,16 @@ class MainActivity : Activity() {
             makeText("NAVEGACIÓN", 17f, red, true)
         )
 
-        val mapPreview = TextView(this).apply {
-            text = "⌖\n\nGOOGLE MAPS\n\nVista del mapa"
-            textSize = 20f
-            gravity = Gravity.CENTER
-            setTextColor(gray)
-
-            background = GradientDrawable().apply {
-                setColor(Color.rgb(21, 25, 29))
-                cornerRadius = dp(12).toFloat()
-            }
+        val mapPreview = WebView(this).apply {
+            setBackgroundColor(Color.rgb(21, 25, 29))
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            webViewClient = android.webkit.WebViewClient()
+            loadUrl("https://www.openstreetmap.org")
         }
 
         map.addView(
@@ -393,7 +423,7 @@ class MainActivity : Activity() {
         )
 
         map.addView(
-            makeButton("ABRIR NAVEGACIÓN") {
+            makeButton("ABRIR GOOGLE MAPS") {
                 openMaps()
             }
         )
@@ -1179,35 +1209,160 @@ val search = EditText(this).apply {
         parent.addView(metric, params)
     }
 
+    // BLUETOOTH: BASE VISUAL (CONEXION REAL EN UNA ETAPA POSTERIOR)
+
+    private fun bluetoothScreen(): View {
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(8))
+        }
+
+        column.addView(makeText("BLUETOOTH AUDIO", 21f, red, true))
+        column.addView(makeText("Conecta tu celular y reproduce música desde tus aplicaciones favoritas", 12f, gray))
+
+        val device = makeCard().apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+        }
+
+        device.addView(makeText("ᛒ", 42f, red, true))
+        device.addView(makeText("TELÉFONO", 16f, white, true))
+        device.addView(makeText("Sin dispositivo conectado", 12f, gray))
+        device.addView(makeText("AUDIO BLUETOOTH · A2DP", 10f, red, true))
+
+        column.addView(device, LinearLayout.LayoutParams(-1, dp(190)).apply {
+            setMargins(0, dp(12), 0, dp(10))
+        })
+
+        val controls = makeCard()
+        controls.addView(makeText("CONTROLES MULTIMEDIA", 15f, red, true))
+        controls.addView(makeText("Anterior          ▶ / Ⅱ          Siguiente", 17f, white, true))
+        controls.addView(makeText("El nombre de la canción y el artista aparecerán cuando el teléfono comparta esos datos.", 11f, gray))
+        column.addView(controls, LinearLayout.LayoutParams(-1, dp(115)).apply {
+            setMargins(0, 0, 0, dp(10))
+        })
+
+        column.addView(makeButton("ABRIR AJUSTES DE BLUETOOTH") {
+            try {
+                startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            } catch (e: Exception) {
+                Toast.makeText(this, "No se pudieron abrir los ajustes Bluetooth", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        return column
+    }
+
+    // DIAGNOSTIC CAR: BASE VISUAL CON DATOS DE EJEMPLO VACÍOS
+
+    private fun diagnosticScreen(): View {
+
+        val scroll = ScrollView(this)
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+
+        column.addView(makeText("DIAGNOSTIC CAR", 22f, red, true))
+        column.addView(makeText("Centro de diagnóstico del vehículo · OBD2 ELM327", 12f, gray))
+
+        val status = makeCard().apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val engineIcon = makeText("⚠", 38f, red, true)
+        status.addView(engineIcon, LinearLayout.LayoutParams(dp(64), dp(70)))
+        val statusText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(makeText("CHECK ENGINE", 16f, white, true))
+            addView(makeText("Esperando conexión con ELM327", 11f, gray))
+            addView(makeText("ESTADO: SIN CONEXIÓN", 10f, red, true))
+        }
+        status.addView(statusText, LinearLayout.LayoutParams(0, -2, 1f))
+        column.addView(status, LinearLayout.LayoutParams(-1, dp(100)).apply {
+            setMargins(0, dp(12), 0, dp(10))
+        })
+
+        column.addView(makeText("DATOS EN VIVO", 15f, red, true))
+        val metrics = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        addMetric(metrics, "RPM", "--")
+        addMetric(metrics, "VELOCIDAD", "--")
+        addMetric(metrics, "REFRIGERANTE", "--")
+        column.addView(metrics, LinearLayout.LayoutParams(-1, dp(112)))
+
+        val codes = makeCard()
+        codes.addView(makeText("CÓDIGOS DE FALLA", 16f, red, true))
+        codes.addView(makeText("No hay códigos disponibles", 14f, white, true))
+        codes.addView(makeText("Conecta el adaptador OBD2 para consultar los códigos que reporte el vehículo.", 11f, gray))
+        column.addView(codes, LinearLayout.LayoutParams(-1, dp(125)).apply {
+            setMargins(0, dp(8), 0, dp(10))
+        })
+
+        column.addView(makeButton("CONFIGURAR BLUETOOTH") {
+            try {
+                startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+            } catch (e: Exception) {
+                Toast.makeText(this, "No se pudieron abrir los ajustes Bluetooth", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        scroll.addView(column)
+        return scroll
+    }
+
+    // AJUSTES: BASE VISUAL DE PERSONALIZACIÓN
+
+    private fun settingsScreen(): View {
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(8))
+        }
+
+        column.addView(makeText("AJUSTES", 22f, red, true))
+        column.addView(makeText("Personaliza la apariencia de Arturo Car Launcher", 12f, gray))
+
+        val vehicle = makeCard()
+        vehicle.addView(makeText("MI VEHÍCULO", 16f, red, true))
+        vehicle.addView(makeText("Logotipo: no seleccionado", 13f, white))
+        vehicle.addView(makeText("Marca y modelo: personalizables", 11f, gray))
+        vehicle.addView(makeButton("PERSONALIZAR VEHÍCULO") {
+            Toast.makeText(this, "La personalización se habilitará en la siguiente etapa", Toast.LENGTH_SHORT).show()
+        })
+        column.addView(vehicle, LinearLayout.LayoutParams(-1, dp(150)).apply {
+            setMargins(0, dp(12), 0, dp(10))
+        })
+
+        val appearance = makeCard()
+        appearance.addView(makeText("APARIENCIA", 16f, red, true))
+        appearance.addView(makeText("Tema: Negro / Rojo", 13f, white))
+        appearance.addView(makeText("Orientación: Horizontal", 11f, gray))
+        appearance.addView(makeText("Resolución de referencia: 1280 × 720", 11f, gray))
+        column.addView(appearance, LinearLayout.LayoutParams(-1, dp(125)))
+
+        return column
+    }
+
     // MAPS
 
     private fun mapsScreen(): View {
 
-        val column = LinearLayout(this).apply {
+        // La opción MAPS abre Google Maps a pantalla completa.
+        openMaps()
+
+        val message = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(dp(20), dp(20), dp(20), dp(20))
+            addView(makeText("GOOGLE MAPS", 22f, red, true))
+            addView(makeText("Si no se abrió automáticamente, toca el botón.", 12f, gray))
+            addView(makeButton("ABRIR GOOGLE MAPS") {
+                openMaps()
+            })
         }
 
-        column.addView(
-            makeText("GOOGLE MAPS", 25f, red, true)
-        )
-
-        column.addView(
-            makeText(
-                "Navegación y búsqueda de destinos",
-                14f,
-                gray
-            )
-        )
-
-        column.addView(
-            makeButton("ABRIR GOOGLE MAPS") {
-                openMaps()
-            }
-        )
-
-        return column
+        return message
     }
 
     // ABRIR MAPS
