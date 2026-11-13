@@ -78,6 +78,18 @@ class MainActivity : Activity() {
         return (value * resources.displayMetrics.density).toInt()
     }
 
+    // MEDIDAS ADAPTABLES: se calculan en dp, no en pixeles.
+    private val screenWidthDp: Int
+        get() = resources.configuration.screenWidthDp
+
+    private val screenHeightDp: Int
+        get() = resources.configuration.screenHeightDp
+
+    private fun isCompactWidth(): Boolean = screenWidthDp < 720
+
+    private fun isCompactHeight(): Boolean = screenHeightDp < 420
+
+
     // PERMISOS
 
     private fun hasAudioPermission(): Boolean {
@@ -169,10 +181,15 @@ class MainActivity : Activity() {
 
     private fun createMainLayout() {
 
+        val compactHeight = isCompactHeight()
+        val horizontalPadding = if (isCompactWidth()) 6 else 12
+        val headerHeight = if (compactHeight) 40 else 48
+        val navigationHeight = if (compactHeight) 50 else 62
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(horizontalPadding), dp(4), dp(horizontalPadding), dp(4))
         }
 
         val header = LinearLayout(this).apply {
@@ -183,7 +200,7 @@ class MainActivity : Activity() {
 
         val settingsButton = TextView(this).apply {
             text = "⚙"
-            textSize = 23f
+            textSize = if (isCompactWidth()) 19f else 23f
             gravity = Gravity.CENTER
             setTextColor(white)
             background = GradientDrawable().apply {
@@ -196,38 +213,31 @@ class MainActivity : Activity() {
 
         header.addView(
             settingsButton,
-            LinearLayout.LayoutParams(dp(42), dp(38)).apply {
-                setMargins(0, 0, dp(10), 0)
+            LinearLayout.LayoutParams(dp(40), dp(if (compactHeight) 34 else 38)).apply {
+                setMargins(0, 0, dp(8), 0)
             }
         )
 
         val logo = TextView(this).apply {
             text = "ARTURO CAR"
-            textSize = 20f
+            textSize = if (isCompactWidth()) 17f else 20f
             setTextColor(white)
             typeface = Typeface.DEFAULT_BOLD
         }
 
         val subtitle = TextView(this).apply {
             text = "  LAUNCHER"
-            textSize = 11f
+            textSize = if (isCompactWidth()) 9f else 11f
             setTextColor(red)
         }
 
         header.addView(logo)
         header.addView(subtitle)
 
-        root.addView(
-            header,
-            LinearLayout.LayoutParams(-1, dp(48))
-        )
+        root.addView(header, LinearLayout.LayoutParams(-1, dp(headerHeight)))
 
         content = FrameLayout(this)
-
-        root.addView(
-            content,
-            LinearLayout.LayoutParams(-1, 0, 1f)
-        )
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
         navigation = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -235,11 +245,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(24, 24, 28))
         }
 
-        root.addView(
-            navigation,
-            LinearLayout.LayoutParams(-1, dp(66))
-        )
-
+        root.addView(navigation, LinearLayout.LayoutParams(-1, dp(navigationHeight)))
         setContentView(root)
     }
 
@@ -290,44 +296,38 @@ class MainActivity : Activity() {
             "⌖" to "MAPS"
         )
 
+        val compact = isCompactWidth()
+        val labels = mapOf(
+            "INICIO" to "INICIO",
+            "APPS" to "APPS",
+            "MÚSICA" to "MÚSICA",
+            "BLUETOOTH" to "BT",
+            "AUTONOMÍA" to "AUTO",
+            "DIAGNOSTIC CAR" to "OBD",
+            "MAPS" to "MAPS"
+        )
+
         items.forEach { item ->
-
             val selected = currentPage == item.second
-
             val button = TextView(this).apply {
-                text = "${item.first}\n${item.second}"
-                textSize = if (item.second == "DIAGNOSTIC CAR") 7f else 8f
+                text = if (compact) item.first else "${item.first}\\n${labels[item.second]}"
+                textSize = if (compact) 20f else 9f
                 gravity = Gravity.CENTER
                 setTextColor(if (selected) red else gray)
-
-                typeface = if (selected) {
-                    Typeface.DEFAULT_BOLD
-                } else {
-                    Typeface.DEFAULT
-                }
-
+                typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                 background = GradientDrawable().apply {
-                    setColor(
-                        if (selected) Color.rgb(55, 20, 25)
-                        else Color.TRANSPARENT
-                    )
-                    cornerRadius = dp(9).toFloat()
-                    if (selected) {
-                        setStroke(dp(1), red)
-                    }
+                    setColor(if (selected) Color.rgb(55, 20, 25) else Color.TRANSPARENT)
+                    cornerRadius = dp(8).toFloat()
+                    if (selected) setStroke(dp(1), red)
                 }
                 setPadding(dp(1), 0, dp(1), 0)
                 maxLines = 2
-
-                setOnClickListener {
-                    showPage(item.second)
-                }
+                contentDescription = item.second
+                setOnClickListener { showPage(item.second) }
             }
-
-            navigation.addView(
-                button,
-                LinearLayout.LayoutParams(0, -1, 1f)
-            )
+            navigation.addView(button, LinearLayout.LayoutParams(0, -1, 1f).apply {
+                setMargins(dp(1), dp(2), dp(1), dp(2))
+            })
         }
     }
 
@@ -371,7 +371,7 @@ class MainActivity : Activity() {
 
         return TextView(this).apply {
             text = label
-            textSize = 12f
+            textSize = if (isCompactHeight()) 10f else 12f
             gravity = Gravity.CENTER
             setTextColor(white)
             typeface = Typeface.DEFAULT_BOLD
@@ -393,18 +393,15 @@ class MainActivity : Activity() {
 
     private fun homeScreen(): View {
 
+        val compact = isCompactWidth()
+        val compactHeight = isCompactHeight()
         val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(8), dp(4), dp(8))
+            orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
         }
 
-        // MAPS
-
         val map = makeCard()
-
-        map.addView(
-            makeText("NAVEGACIÓN", 17f, red, true)
-        )
+        map.addView(makeText("NAVEGACIÓN", 17f, red, true))
 
         val mapPreview = WebView(this).apply {
             setBackgroundColor(Color.rgb(21, 25, 29))
@@ -418,56 +415,32 @@ class MainActivity : Activity() {
             loadUrl("https://www.openstreetmap.org")
         }
 
-        map.addView(
-            mapPreview,
-            LinearLayout.LayoutParams(-1, 0, 1f)
-        )
+        if (compact) {
+            map.addView(mapPreview, LinearLayout.LayoutParams(-1, dp(if (compactHeight) 105 else 145)))
+        } else {
+            map.addView(mapPreview, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
 
-        map.addView(
-            makeButton("ABRIR GOOGLE MAPS") {
-                openMaps()
-            }
-        )
-
-        // MUSICA
+        map.addView(makeButton("ABRIR GOOGLE MAPS") { openMaps() })
 
         val music = makeCard()
-
-        music.addView(
-            makeText("REPRODUCTOR", 17f, red, true)
-        )
+        music.addView(makeText("REPRODUCTOR", 17f, red, true))
 
         musicCoverView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             setBackgroundColor(Color.rgb(75, 25, 32))
             setImageResource(android.R.drawable.ic_media_play)
         }
-
         music.addView(
             musicCoverView,
-            LinearLayout.LayoutParams(-1, dp(95))
+            LinearLayout.LayoutParams(-1, dp(if (compactHeight) 55 else if (compact) 75 else 95))
         )
 
-        musicTitleView = makeText(
-            "Selecciona una canción",
-            14f,
-            white,
-            true
-        )
-
-        musicArtistView = makeText(
-            "Artista desconocido",
-            11f,
-            gray
-        )
-
-        musicStatusView = makeText(
-            "Biblioteca musical",
-            10f,
-            red,
-            true
-        )
-
+        musicTitleView = makeText("Selecciona una canción", 14f, white, true)
+        musicArtistView = makeText("Artista desconocido", 11f, gray)
+        musicStatusView = makeText("Biblioteca musical", 10f, red, true)
+        musicTitleView?.maxLines = 1
+        musicArtistView?.maxLines = 1
         music.addView(musicTitleView)
         music.addView(musicArtistView)
         music.addView(musicStatusView)
@@ -476,56 +449,34 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
+        val previous = makeButton("⏮") { previousSong() }
+        playPauseButton = makeButton("▶") { toggleSong() }
+        val next = makeButton("⏭") { nextSong() }
 
-        val previous = makeButton("⏮") {
-            previousSong()
+        fun controlParams() = LinearLayout.LayoutParams(0, dp(38), 1f).apply {
+            setMargins(dp(2), dp(3), dp(2), dp(3))
         }
-
-        playPauseButton = makeButton("▶") {
-            toggleSong()
-        }
-
-        val next = makeButton("⏭") {
-            nextSong()
-        }
-
-        fun controlParams(): LinearLayout.LayoutParams {
-            return LinearLayout.LayoutParams(
-                0,
-                dp(42),
-                1f
-            ).apply {
-                setMargins(dp(2), dp(5), dp(2), dp(5))
-            }
-        }
-
         controls.addView(previous, controlParams())
         controls.addView(playPauseButton, controlParams())
         controls.addView(next, controlParams())
-
         music.addView(controls)
+        music.addView(makeButton("ABRIR MI MÚSICA") { showPage("MÚSICA") })
 
-        music.addView(
-            makeButton("ABRIR MI MÚSICA") {
-                showPage("MÚSICA")
+        if (compact) {
+            panel.addView(map, LinearLayout.LayoutParams(-1, -2).apply {
+                setMargins(0, 0, 0, dp(6))
+            })
+            panel.addView(music, LinearLayout.LayoutParams(-1, -2))
+            val scroll = ScrollView(this).apply {
+                isFillViewport = true
+                addView(panel)
             }
-        )
+            return scroll
+        }
 
-        panel.addView(
-            map,
-            LinearLayout.LayoutParams(0, -1, 1.5f)
-        )
-
-        panel.addView(
-            View(this),
-            LinearLayout.LayoutParams(dp(10), 1)
-        )
-
-        panel.addView(
-            music,
-            LinearLayout.LayoutParams(0, -1, 1f)
-        )
-
+        panel.addView(map, LinearLayout.LayoutParams(0, -1, 1.5f))
+        panel.addView(View(this), LinearLayout.LayoutParams(dp(10), 1))
+        panel.addView(music, LinearLayout.LayoutParams(0, -1, 1f))
         return panel
     }
 
@@ -1013,7 +964,13 @@ val search = EditText(this).apply {
                     .lowercase()
             }
 
-        val columns = 4
+        val columns = when {
+            screenWidthDp < 480 -> 3
+            screenWidthDp < 720 -> 4
+            screenWidthDp < 1000 -> 5
+            else -> 6
+        }
+        val tileHeight = if (isCompactHeight()) 82 else 105
 
         apps.chunked(columns).forEach { group ->
 
@@ -1041,7 +998,7 @@ val search = EditText(this).apply {
 
                     addView(
                         icon,
-                        LinearLayout.LayoutParams(dp(42), dp(42))
+                        LinearLayout.LayoutParams(dp(if (isCompactHeight()) 34 else 42), dp(if (isCompactHeight()) 34 else 42))
                     )
 
                     val name = TextView(this@MainActivity).apply {
@@ -1069,7 +1026,7 @@ val search = EditText(this).apply {
 
                 val params = LinearLayout.LayoutParams(
                     0,
-                    dp(105),
+                    dp(tileHeight),
                     1f
                 )
 
@@ -1081,7 +1038,7 @@ val search = EditText(this).apply {
             repeat(columns - group.size) {
                 row.addView(
                     View(this),
-                    LinearLayout.LayoutParams(0, dp(105), 1f)
+                    LinearLayout.LayoutParams(0, dp(tileHeight), 1f)
                 )
             }
 
@@ -1232,7 +1189,7 @@ val search = EditText(this).apply {
         device.addView(makeText("Sin dispositivo conectado", 12f, gray))
         device.addView(makeText("AUDIO BLUETOOTH · A2DP", 10f, red, true))
 
-        column.addView(device, LinearLayout.LayoutParams(-1, dp(190)).apply {
+        column.addView(device, LinearLayout.LayoutParams(-1, dp(if (isCompactHeight()) 125 else 190)).apply {
             setMargins(0, dp(12), 0, dp(10))
         })
 
@@ -1240,7 +1197,7 @@ val search = EditText(this).apply {
         controls.addView(makeText("CONTROLES MULTIMEDIA", 15f, red, true))
         controls.addView(makeText("Anterior          ▶ / Ⅱ          Siguiente", 17f, white, true))
         controls.addView(makeText("El nombre de la canción y el artista aparecerán cuando el teléfono comparta esos datos.", 11f, gray))
-        column.addView(controls, LinearLayout.LayoutParams(-1, dp(115)).apply {
+        column.addView(controls, LinearLayout.LayoutParams(-1, dp(if (isCompactHeight()) 90 else 115)).apply {
             setMargins(0, 0, 0, dp(10))
         })
 
@@ -1252,7 +1209,11 @@ val search = EditText(this).apply {
             }
         })
 
-        return column
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(column)
+        }
+        return scroll
     }
 
     // DIAGNOSTIC CAR: BASE VISUAL CON DATOS DE EJEMPLO VACÍOS
@@ -1331,7 +1292,7 @@ val search = EditText(this).apply {
         vehicle.addView(makeButton("PERSONALIZAR VEHÍCULO") {
             Toast.makeText(this, "La personalización se habilitará en la siguiente etapa", Toast.LENGTH_SHORT).show()
         })
-        column.addView(vehicle, LinearLayout.LayoutParams(-1, dp(150)).apply {
+        column.addView(vehicle, LinearLayout.LayoutParams(-1, dp(if (isCompactHeight()) 125 else 150)).apply {
             setMargins(0, dp(12), 0, dp(10))
         })
 
@@ -1340,9 +1301,13 @@ val search = EditText(this).apply {
         appearance.addView(makeText("Tema: Negro / Rojo", 13f, white))
         appearance.addView(makeText("Orientación: Horizontal", 11f, gray))
         appearance.addView(makeText("Resolución de referencia: 1280 × 720", 11f, gray))
-        column.addView(appearance, LinearLayout.LayoutParams(-1, dp(125)))
+        column.addView(appearance, LinearLayout.LayoutParams(-1, dp(if (isCompactHeight()) 105 else 125)))
 
-        return column
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(column)
+        }
+        return scroll
     }
 
     // MAPS
