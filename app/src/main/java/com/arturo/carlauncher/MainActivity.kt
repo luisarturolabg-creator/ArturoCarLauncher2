@@ -296,7 +296,6 @@ class MainActivity : Activity() {
             "⌖" to "MAPS"
         )
 
-        val compact = isCompactWidth()
         val labels = mapOf(
             "INICIO" to "INICIO",
             "APPS" to "APPS",
@@ -307,11 +306,13 @@ class MainActivity : Activity() {
             "MAPS" to "MAPS"
         )
 
+        val compact = isCompactWidth()
+
         items.forEach { item ->
             val selected = currentPage == item.second
             val button = TextView(this).apply {
-                text = if (compact) item.first else "${item.first}\\n${labels[item.second]}"
-                textSize = if (compact) 20f else 9f
+                text = "${item.first}\n${labels[item.second]}"
+                textSize = if (compact) 8f else 9f
                 gravity = Gravity.CENTER
                 setTextColor(if (selected) red else gray)
                 typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
@@ -322,12 +323,17 @@ class MainActivity : Activity() {
                 }
                 setPadding(dp(1), 0, dp(1), 0)
                 maxLines = 2
+                includeFontPadding = false
                 contentDescription = item.second
                 setOnClickListener { showPage(item.second) }
             }
-            navigation.addView(button, LinearLayout.LayoutParams(0, -1, 1f).apply {
-                setMargins(dp(1), dp(2), dp(1), dp(2))
-            })
+
+            navigation.addView(
+                button,
+                LinearLayout.LayoutParams(0, -1, 1f).apply {
+                    setMargins(dp(1), dp(2), dp(1), dp(2))
+                }
+            )
         }
     }
 
@@ -395,34 +401,73 @@ class MainActivity : Activity() {
 
         val compact = isCompactWidth()
         val compactHeight = isCompactHeight()
+
         val panel = LinearLayout(this).apply {
             orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setPadding(dp(5), dp(5), dp(5), dp(5))
         }
 
-        val map = makeCard()
-        map.addView(makeText("NAVEGACIÓN", 17f, red, true))
+        // PANEL DEL VEHÍCULO
+        val vehicle = makeCard()
+        vehicle.addView(makeText("MI VEHÍCULO", 17f, red, true))
+        vehicle.addView(makeText("Panel de información del automóvil", 10f, gray))
 
-        val mapPreview = WebView(this).apply {
-            setBackgroundColor(Color.rgb(21, 25, 29))
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.loadWithOverviewMode = true
-            settings.useWideViewPort = true
-            isVerticalScrollBarEnabled = false
-            isHorizontalScrollBarEnabled = false
-            webViewClient = android.webkit.WebViewClient()
-            loadUrl("https://www.openstreetmap.org")
+        val speedPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(5), dp(8), dp(5))
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(20, 21, 25))
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.rgb(75, 35, 42))
+            }
         }
+        speedPanel.addView(makeText("VELOCIDAD", 10f, gray, true))
+        speedPanel.addView(makeText("--", if (compactHeight) 34f else 42f, white, true))
+        speedPanel.addView(makeText("km/h  ·  SIN CONEXIÓN OBD2", 9f, red, true))
 
-        if (compact) {
-            map.addView(mapPreview, LinearLayout.LayoutParams(-1, dp(if (compactHeight) 105 else 145)))
-        } else {
-            map.addView(mapPreview, LinearLayout.LayoutParams(-1, 0, 1f))
+        vehicle.addView(
+            speedPanel,
+            LinearLayout.LayoutParams(-1, dp(if (compactHeight) 88 else 112)).apply {
+                setMargins(0, dp(8), 0, dp(8))
+            }
+        )
+
+        val vehicleMetrics = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
         }
+        addMetric(vehicleMetrics, "RPM", "--")
+        addMetric(vehicleMetrics, "KM/L", "--")
+        addMetric(vehicleMetrics, "COMBUSTIBLE", "--")
+        vehicle.addView(
+            vehicleMetrics,
+            LinearLayout.LayoutParams(-1, dp(if (compactHeight) 72 else 86))
+        )
 
-        map.addView(makeButton("ABRIR GOOGLE MAPS") { openMaps() })
+        vehicle.addView(
+            makeText("OBD2: ELM327 no conectado", 10f, gray)
+        )
 
+        val vehicleActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val obdButton = makeButton("DIAGNÓSTICO") { showPage("DIAGNOSTIC CAR") }
+        val autonomyButton = makeButton("AUTONOMÍA") { showPage("AUTONOMÍA") }
+        vehicleActions.addView(
+            obdButton,
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                setMargins(0, dp(5), dp(3), 0)
+            }
+        )
+        vehicleActions.addView(
+            autonomyButton,
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                setMargins(dp(3), dp(5), 0, 0)
+            }
+        )
+        vehicle.addView(vehicleActions)
+
+        // REPRODUCTOR MUSICAL
         val music = makeCard()
         music.addView(makeText("REPRODUCTOR", 17f, red, true))
 
@@ -433,12 +478,17 @@ class MainActivity : Activity() {
         }
         music.addView(
             musicCoverView,
-            LinearLayout.LayoutParams(-1, dp(if (compactHeight) 55 else if (compact) 75 else 95))
+            LinearLayout.LayoutParams(
+                -1,
+                dp(if (compactHeight) 65 else if (compact) 95 else 120)
+            ).apply {
+                setMargins(0, dp(7), 0, dp(7))
+            }
         )
 
         musicTitleView = makeText("Selecciona una canción", 14f, white, true)
         musicArtistView = makeText("Artista desconocido", 11f, gray)
-        musicStatusView = makeText("Biblioteca musical", 10f, red, true)
+        musicStatusView = makeText("BIBLIOTECA MUSICAL", 10f, red, true)
         musicTitleView?.maxLines = 1
         musicArtistView?.maxLines = 1
         music.addView(musicTitleView)
@@ -449,13 +499,12 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
+        fun controlParams() = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+            setMargins(dp(2), dp(5), dp(2), dp(5))
+        }
         val previous = makeButton("⏮") { previousSong() }
         playPauseButton = makeButton("▶") { toggleSong() }
         val next = makeButton("⏭") { nextSong() }
-
-        fun controlParams() = LinearLayout.LayoutParams(0, dp(38), 1f).apply {
-            setMargins(dp(2), dp(3), dp(2), dp(3))
-        }
         controls.addView(previous, controlParams())
         controls.addView(playPauseButton, controlParams())
         controls.addView(next, controlParams())
@@ -463,19 +512,22 @@ class MainActivity : Activity() {
         music.addView(makeButton("ABRIR MI MÚSICA") { showPage("MÚSICA") })
 
         if (compact) {
-            panel.addView(map, LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, 0, 0, dp(6))
-            })
+            panel.addView(
+                vehicle,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    setMargins(0, 0, 0, dp(7))
+                }
+            )
             panel.addView(music, LinearLayout.LayoutParams(-1, -2))
-            val scroll = ScrollView(this).apply {
+
+            return ScrollView(this).apply {
                 isFillViewport = true
                 addView(panel)
             }
-            return scroll
         }
 
-        panel.addView(map, LinearLayout.LayoutParams(0, -1, 1.5f))
-        panel.addView(View(this), LinearLayout.LayoutParams(dp(10), 1))
+        panel.addView(vehicle, LinearLayout.LayoutParams(0, -1, 1.15f))
+        panel.addView(View(this), LinearLayout.LayoutParams(dp(8), 1))
         panel.addView(music, LinearLayout.LayoutParams(0, -1, 1f))
         return panel
     }
@@ -1314,21 +1366,100 @@ val search = EditText(this).apply {
 
     private fun mapsScreen(): View {
 
-        // La opción MAPS abre Google Maps a pantalla completa.
-        openMaps()
-
-        val message = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(20), dp(20), dp(20), dp(20))
-            addView(makeText("GOOGLE MAPS", 22f, red, true))
-            addView(makeText("Si no se abrió automáticamente, toca el botón.", 12f, gray))
-            addView(makeButton("ABRIR GOOGLE MAPS") {
-                openMaps()
-            })
+            setPadding(dp(5), dp(5), dp(5), dp(5))
         }
 
-        return message
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val search = EditText(this).apply {
+            hint = "Buscar lugar o dirección..."
+            setHintTextColor(gray)
+            setTextColor(white)
+            textSize = 13f
+            singleLine = true
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            setPadding(dp(12), 0, dp(12), 0)
+            background = GradientDrawable().apply {
+                setColor(card)
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(1), Color.rgb(75, 35, 42))
+            }
+        }
+
+        val searchButton = makeButton("BUSCAR") { }
+        toolbar.addView(
+            search,
+            LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                setMargins(0, 0, dp(5), 0)
+            }
+        )
+        toolbar.addView(searchButton, LinearLayout.LayoutParams(dp(86), dp(44)))
+        root.addView(toolbar)
+
+        val mapView = WebView(this).apply {
+            setBackgroundColor(Color.rgb(21, 25, 29))
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
+            settings.builtInZoomControls = true
+            settings.displayZoomControls = false
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            webViewClient = android.webkit.WebViewClient()
+            loadUrl("https://www.openstreetmap.org")
+        }
+
+        root.addView(
+            mapView,
+            LinearLayout.LayoutParams(-1, 0, 1f).apply {
+                setMargins(0, dp(6), 0, dp(6))
+            }
+        )
+
+        searchButton.setOnClickListener {
+            val query = search.text.toString().trim()
+            if (query.isNotEmpty()) {
+                mapView.loadUrl(
+                    "https://www.openstreetmap.org/search?query=${Uri.encode(query)}"
+                )
+            } else {
+                Toast.makeText(this, "Escribe un lugar para buscar", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        search.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                searchButton.performClick()
+                true
+            } else {
+                false
+            }
+        }
+
+        val bottomActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        bottomActions.addView(
+            makeButton("RECARGAR MAPA") { mapView.reload() },
+            LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                setMargins(0, 0, dp(4), 0)
+            }
+        )
+        bottomActions.addView(
+            makeButton("GOOGLE MAPS") { openMaps() },
+            LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                setMargins(dp(4), 0, 0, 0)
+            }
+        )
+        root.addView(bottomActions)
+
+        return root
     }
 
     // ABRIR MAPS
