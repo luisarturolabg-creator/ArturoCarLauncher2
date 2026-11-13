@@ -1381,7 +1381,7 @@ val search = EditText(this).apply {
             setHintTextColor(gray)
             setTextColor(white)
             textSize = 13f
-            singleLine = true
+            isSingleLine = true
             imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
             setPadding(dp(12), 0, dp(12), 0)
             background = GradientDrawable().apply {
